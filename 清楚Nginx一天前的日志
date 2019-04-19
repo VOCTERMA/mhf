@@ -1,0 +1,11 @@
+#!/bin/bash
+#日志位置
+log_path=/usr/local/nginx/logs
+#当天日期
+today=`date -d'today' +%Y-%m-%d`
+#将access.log更名为access_当天日期.log形式
+mv ${log_path}/access.log ${log_path}/access_${today}.log
+#将USR1信号发送给pid,父进程KILL掉接受数据完后的子进程，父进程读取新的配置文件access.log,父进程fork新的子进程
+kill -USR1 $(cat /usr/local/nginx/logs/nginx.pid)
+#删除掉1天前的access_日期.log
+find ${log_path} -mtime +1 -type f -name "access_*.log" -exec rm -rf {} \;
