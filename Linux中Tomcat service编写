@@ -1,0 +1,21 @@
+[Unit]
+#服务简单说明
+Description=tomcat1.service
+#在哪个服务组启动后再启动
+After=network.target
+弱依赖，即使network.service宕掉，该服务也不会停止，Require 强依赖，一服务宕掉，依赖服务停止
+Wants=network.service
+[Service]
+启动类型fork,父进程停掉，子进程变为主进程，使用此类型，需指定PIDFile
+Type=forking
+#需要在catalina.sh中添加PIDFILE
+PIDFile=/var/run/tomcat.pid
+Environment='JAVA_HOME=/usr/local/jdk1.8.0_171'
+Environment='JRE_HOME=/usr/local/jdk1.8.0_171/jre'
+ExecStart=/usr/local/apache-tomcat-81/bin/startup.sh
+ExecStop=/usr/local/apache-tomcat-81/bin/shutdown.sh
+#服务重启，$MAINPID 程序主进程
+ExecReload=/bin/kill -HUB $MAINPID
+Private Tmp=true
+[Install]
+WantedBy=multi-user.target
