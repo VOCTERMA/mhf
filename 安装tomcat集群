@@ -1,0 +1,56 @@
+#! /bin/bash
+yum -y install net-tools >>/dev/null
+function install_jdk()
+{
+cd /usr/local/src
+tar -zxvf jdk-7u80-linux-x64.tar.gz -C /usr/local >>/dev/null
+cat >>/etc/profile<<EOF
+#jdk
+JAVA_HOME=/usr/local/jdk1.7.0_80
+JRE_HOME=/usr/local/jdk1.7.0_80/jre
+CLASS_PATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib
+PATH=$PATH:$JAVA_HOME/bin
+EOF
+}
+function install_tomcat()
+{
+chmod +x /etc/rc.d/rc.local
+cat >>/etc/rc.d/rc.local<<EOF
+export JAVA_HOME=/usr/local/jdk1.7.0_80
+EOF
+for((i=1;i<=$1;i++))
+do
+cd /usr/local/src
+tar -zxvf apache-tomcat-7.0.77.tar.gz >>/dev/null 
+mv apache-tomcat-7.0.77 /usr/local/apache-tomcat-7$i
+cat >>/etc/rc.d/rc.local<<EOF
+/usr/local/apache-tomcat-7$i/bin/startup.sh
+EOF
+cat >>/etc/profile<<EOF
+export CATALINA_BASE$i=/usr/local/apache-tomcat-7$i
+export CATALINA_HOME$i=/usr/local/apache-tomcat-7$i
+export TOMCAT_HOME$i=/usr/local/apache-tomcat-7$i
+EOF
+#source /etc/profile如果加这里无限循环
+if [[ $i -ge 2 ]]; then
+	sed -i "107a export CATALINA_BASE=\$CATALINA_BASE$i" /usr/local/apache-tomcat-7$i/bin/catalina.sh 
+	sed -i "107a export CATALINA_HOME=\$CATALINA_BASE$i" /usr/local/apache-tomcat-7$i/bin/catalina.sh
+       #sed 新增中变量值原样输入需要加转义符，不然输出为空 
+        sed -i "s/8005/800$i/g" /usr/local/apache-tomcat-7"$i"/conf/server.xml
+       #变量在数字尾部不用双引号
+        sed -i "s/8080/8"$i"80/g" /usr/local/apache-tomcat-7"$i"/conf/server.xml
+        sed -i "s/8009/80"$i"9/g" /usr/local/apache-tomcat-7"$i"/conf/server.xml
+fi
+if [ $? -eq 0 ];then
+ echo -e "第"$i"个tomcat安装成功"
+else
+ echo -e "第"$i"个tomcat安装失败"#打印变量双引号中的双引号
+fi
+sleep 10
+done
+source /etc/profile
+}
+install_jdk
+echo -e "\a\n\e[1;31m请输入安装次数（只输入数字）： \e[0m"
+read num
+install_tomcat $num
