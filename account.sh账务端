@@ -1,0 +1,144 @@
+#!/bin/bash             
+#create time: 2018-06-22
+#user:MA..              
+############################################################################
+
+isroot()
+{
+if [[ ${USER} -eq 'root' ]];then
+	echo -e "\n\e[1;36m该用户是root用户！\e[0m"
+else
+	echo -e '\n\e[1;31m该用户不是root用户！\e[0m'
+	exit 1
+fi
+}
+isroot
+
+isuser()
+{
+username1=`cat /etc/passwd | grep '$1' | awk -F : '{print $1}'`
+#字符串时用=
+if [[ ${username1} = $1 ]];then
+        #当有变量时要使用双引号
+	echo -e "\n\e[1;31m$1已存在！\e[0m"
+else
+	useradd -g oinstall $1
+	if [[ $? -eq 0 ]];then
+		echo -e "\n\e[1;36m$1创建成功！\e[0m"
+		echo "$2" | passwd --stdin $1
+        else
+		echo -e "\n\e[1;31m$1已存在！\e[0m"
+		
+	fi
+fi
+}
+echo -e '=================================================================='
+echo -e '\n\e[1;36m请输入你要创建的账务端用户名：\e[0m'
+stty erase ^H
+read a
+echo -e '\n\e[1;36m请输入你要创建的账务端用户密码：\e[0m'
+stty erase ^H
+read b
+isuser $a $b
+tar_code()
+{
+cp /usr/local/src/$1 /home/$a
+cd /home/$a
+# -e 文件存在为真
+if [ -e $1 ];then
+	tar -xvf $1
+else
+	echo -e '\n\e[1;31m$1不存在！\e[0m'
+fi
+rm -rf $1
+}
+echo -e '=================================================================='
+echo -e '\n\e[1;36m请输入你的账务端文件名：\e[0m'
+stty erase ^H
+read d
+tar_code $d
+cd /home
+chown -R $a:oinstall /home/$a
+chmod 755 -R /home/$a
+#########################################################################
+i_profile()
+{
+ORACLE_HOME_LOCAL=`cat /home/oracle/.bash_profile | grep 'export ORACLE_HOME'`
+ORACLE_HOME_OLD=`cat /home/$a/.bash_profile | grep 'export ORACLE_HOME'`
+sed -i "s%${ORACLE_HOME_OLD}%${ORACLE_HOME_LOCAL}%" /home/$a/.bash_profile
+ORACLE_ORACLE_BASE=`cat /home/oracle/.bash_profile | grep 'export ORACLE_BASE'`
+HFMP_ORACLE_BASE=`cat /home/$a/.bash_profile | grep 'export ORACLE_BASE'`
+sed -i "s%${HFMP_ORACLE_BASE}%${ORACLE_ORACLE_BASE}%" /home/$a/.bash_profile
+ORACLE_ORACLE_SID=`cat /home/oracle/.bash_profile | grep 'export ORACLE_SID'`
+HFMP_ORACLE_SID=`cat /home/$a/.bash_profile | grep 'export ORACLE_SID'`
+sed -i "s%${HFMP_ORACLE_SID}%${ORACLE_ORACLE_SID}%" /home/$a/.bash_profile
+LD_LIBRARY_PATH_NEW=`cat /home/$a/.bash_profile | grep 'LD_LIBRARY_PATH'`
+PATH_OLD_LIB=`echo ${LD_LIBRARY_PATH_NEW} | awk -F : '{print $4}'`
+sed -i "s%${PATH_OLD_LIB}%/home/$a/lib%" /home/$a/.bash_profile
+DBUSER_OLD=`cat /home/$a/.bash_profile | grep 'export DBUSER' | awk -F = '{print $2}'`
+sed -i "s%${DBUSER_OLD}%$5%" /home/$a/.bash_profile
+PASSWD_OLD=`cat /home/$a/.bash_profile | grep 'PASSWD' | awk -F = '{print $2}'`
+sed -i "s%${PASSWD_OLD}%$1%" /home/$a/.bash_profile
+ORACLE_HOME_PATH_LOCAL=`cat /home/oracle/.bash_profile | grep 'export ORACLE_HOME' | awk -F = '{print $2}'`
+echo ${ORACLE_HOME_PATH_LOCAL}
+#-z判断字符长度为0则为真,$2数据库标识 $3 所要连接服务器的IP
+if [[ -z `cat ${ORACLE_HOME_PATH_LOCAL}/network/admin/tnsnames.ora | grep $2` ]]
+ then
+    echo "
+$2 =
+  (DESCRIPTION=
+    (ADDRESS= (PROTOCOL = TCP)(HOST = $3)(PORT = 1521))
+    (CONNECT_DATA=
+      (SERVER= DEDICATED)
+      (SERVICE_NAME= orcl)
+    )
+  )" >> ${ORACLE_HOME_PATH_LOCAL}/network/admin/tnsnames.ora
+else
+  echo -e "\n\e[1;36m$2 is exist! \e[0m"
+fi
+TNS_OLD=`cat /home/$a/.bash_profile | grep 'export TNS' | awk -F = '{print $2}'`
+sed -i "s/${TNS_OLD}/$2/" /home/$a/.bash_profile
+LD_LIBRARY_PATH_NEW=`cat /home/$a/.bash_profile | grep 'LD_LIBRARY_PATH'`
+PATH_OLD_LIB=`echo ${LD_LIBRARY_PATH_NEW} | awk -F : '{print $4}'`
+sed -i "s%${PATH_OLD_LIB}%/home/$a/lib%" /home/$a/.bash_profile
+TNS_NEW=`cat /home/$a/.bash_profile | grep 'export TNS=' | awk -F = '{print $2}'`
+JAPPHOME_OLD=`cat /home/$a/.bash_profile | grep 'export JAPPHOME' | awk -F = '{print $2}'`
+sed -i "s%${JAPPHOME_OLD}%/home/$a%" /home/$a/.bash_profile
+JAPPNAME_OLD=`cat /home/$a/.bash_profile | grep 'export JAPPNAME' | awk -F = '{print $2}'`
+sed -i "s%${JAPPNAME_OLD}%$a%" /home/$a/.bash_profile
+source /home/$a/.bash_profile
+cd /home/$a/config
+# $4访问账务端的IP
+cat >> AuthIp.cfg << EOF
+
+$4   9       hfmp
+EOF
+USER_OLD=`cat BizParam.cfg | grep '12' | awk -F ' ' '{print $2}'`
+sed -i "s/${USER_OLD}/$5/" BizParam.cfg
+sed -i "/11/c\11                     $2         数据库标识" BizParam.cfg
+}
+echo -e '=================================================================='
+echo -e "\n\e[1;36m请输入你的数据库用户名：\e[0m"
+stty erase ^H
+read cd
+echo -e "\n\e[1;36m请输入你的数据库用户的密码：\e[0m"
+stty erase ^H
+read e
+echo -e '\n\e[1;36m请输入你的数据库标识：\e[0m'
+stty erase ^H
+read f
+echo -e "\n\e[1;36m请输入你的数据库所在的服务器IP：\e[0m"
+stty erase ^H
+read g
+echo -e '\n\e[1;36m请输入WEB端的IP：\e[0m'
+stty erase ^H
+read ab
+i_profile $e $f $g ${ab} ${cd}
+
+cd /home/$a/bin
+CODE=`./reg | grep ':' | awk -F : '{print substr($2,2,32)}'`
+./gen << EOF
+1
+${CODE}
+EOF
+su - $a -c 'cd bin;./restart'
